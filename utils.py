@@ -5,6 +5,12 @@ import os
 import sys
 import torch
 from huggingface_hub import hf_hub_download
+import numpy as np
+
+from typing import Any, BinaryIO, List, Optional, Tuple, Union
+
+
+import matplotlib.pyplot as plt
 
 def get_available_models():
     available_models = [
@@ -172,9 +178,11 @@ def preprocess_image(image_path, image_size):
 
     return img
 
-def visualize_attentions(model, img, patch_size, save_name="atts", device=torch.device("cpu"), threshold=None, separate_heads=True):
+def visualize_attentions(model, img, patch_size, save_name="atts", device=torch.device("cpu"), threshold=None, separate_heads=True, layernum = 1):
     from torch.nn.functional import interpolate
     from torchvision.utils import save_image
+    from os.path import join
+
     import random, colorsys
 
     def random_colors(N, bright=True):
@@ -194,7 +202,8 @@ def visualize_attentions(model, img, patch_size, save_name="atts", device=torch.
     w_featmap = img.shape[-2] // patch_size
     h_featmap = img.shape[-1] // patch_size
 
-    attentions = model.get_last_selfattention(img.to(device))
+    ## Change from original by Alban!
+    attentions = model.get_intermediate_selfattention(img.to(device), n = layernum)
 
     nh = attentions.shape[1]  # number of heads
 
@@ -228,9 +237,10 @@ def visualize_attentions(model, img, patch_size, save_name="atts", device=torch.
         bw_attentions[i, 2, :, :] = attentions[i, :, :]
 
     print('Attentions min, max:', bw_attentions.min(), bw_attentions.max())
-
+    dirroot = 'outputs_visualization/'
+    print(bw_attentions.shape)
     if separate_heads:
-        save_image(bw_attentions[:7], 'all_heads_' + save_name, nrow=7, padding=0, normalize=True, scale_each=False)
+        save_image(bw_attentions[:], join(dirroot,'all_heads_' + save_name + f'_{13-layernum}.png'), nrow=bw_attentions.shape[0], padding=0, normalize=True, scale_each=False, format = 'png')
     else:
         # combined (summed) bw map
         bw_combined_map = torch.sum(bw_attentions, 0, keepdim=True)
@@ -245,7 +255,70 @@ def visualize_attentions(model, img, patch_size, save_name="atts", device=torch.
                 cl_combined_map[0, 2, i, j] = (0.5*colors[max_ind][2] + 0.5) * bw_attentions[max_ind, 2, i, j]
 
         # save combined bw attention map 
-        save_image(bw_combined_map, 'composite_bw_' + save_name, nrow=1, padding=0, normalize=True, scale_each=True)
+        save_image(bw_combined_map, 'composite_bw_' + save_name, nrow=1, padding=0, normalize=True, scale_each=True, format = 'png')
 
         # save combined cl attention map 
-        save_image(cl_combined_map, 'composite_cl_' + save_name, nrow=1, padding=0, normalize=True, scale_each=True)
+        save_image(cl_combined_map, 'composite_cl_' + save_name, nrow=1, padding=0, normalize=True, scale_each=True, format = 'png')
+
+import matplotlib.image as mpimg
+
+def display_image(image_path, max_size=12):
+    """
+    Display a PNG image with automatic sizing
+
+    Args:
+        image_path (str): Path to the PNG file
+        max_size (int): Maximum dimension for display (default: 12 inches)
+    """
+    try:
+        # Load the image
+        img = mpimg.imread(image_path)
+
+        # Get image dimensions
+        height, width = img.shape[:2]
+
+        # Calculate aspect ratio
+        aspect_ratio = width / height
+
+        # Determine figure size based on aspect ratio
+        if aspect_ratio > 1:  # Wider than tall
+            fig_width = max_size
+            fig_height = max_size / aspect_ratio
+        else:  # Taller than wide
+            fig_height = max_size
+            fig_width = max_size * aspect_ratio
+
+        # Display the image
+        plt.figure(figsize=(fig_width, fig_height))
+        plt.imshow(img)
+        plt.axis('off')
+        plt.tight_layout()
+        plt.show()
+
+        # Print image info
+        print(f"Image size: {width} x {height} pixels")
+
+    except Exception as e:
+        print(f"Error loading image: {e}")
+
+### Written by Alban Flachot
+def retrieve_tokens(model, img, patch_size = 14, device=torch.device("cpu"), threshold=None,
+                         separate_heads=True, layer = 1):
+
+    # make the image divisible by the patch size
+    w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
+    img = img[:, :w, :h].unsqueeze(0)
+
+    ## Change from original by Alban
+    ## Note that if layer == 1, we are saving activations from last layer only.
+    ### save attention
+    representations = model.get_intermediate_layers(img.to(device), n=layer)
+
+    # we keep only the output patch attention (cls token)
+    for l in range(len(representations)):
+        CLS_token = representations[l][0,0].detach().cpu().numpy()
+        patch_token = representations[l][0,1:].detach().cpu().numpy()
+    return CLS_token, patch_token
+
+
+

@@ -6,9 +6,12 @@
 *.npz
 *.sh
 *.out
+*.tif
+*.mat
 
 # Directories
 **/__pycache__/
 y_imgs/
 fids/
 venv
+outputs_visualization
