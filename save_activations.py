@@ -15,6 +15,8 @@ if opt.model == 'ego':
     model = load_model('dino_ego4d-200h_vitb14')
 elif opt.model == 'saycam':
     model = load_model('dino_say_vitb14')
+elif opt.model == 'imagenet':
+    model = load_model('dino_imagenet100_vitb14')
 else:
     print('Forgot to specify which model to use')
 
