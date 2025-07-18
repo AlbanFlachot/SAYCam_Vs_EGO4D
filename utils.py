@@ -5,9 +5,6 @@ import os
 import sys
 import torch
 from huggingface_hub import hf_hub_download
-import numpy as np
-
-from typing import Any, BinaryIO, List, Optional, Tuple, Union
 
 
 import matplotlib.pyplot as plt
@@ -38,7 +35,7 @@ def load_model(model_name):
 
     # checks
     assert alg in ["dino", "mugs", "mae"], "Unrecognized algorithm!"
-    assert data in ["say", "sfp", "s", "a", "y", "imagenet100", "imagenet10", "imagenet1", "kinetics-200h", "ego4d-200h"], "Unrecognized data!"
+    assert data in ["say", "sfp", "s", "a", "y", "imagenet100", "imagenet10", "imagenet1", "kinetics-200h", "ego4d-200h", "random"], "Unrecognized data!"
     assert model_spec in ["resnext50", "vitb14", "vitl16", "vitb16", "vits16"], "Unrecognized architecture!"
 
     if model_spec == "resnext50":
@@ -53,15 +50,18 @@ def load_model(model_name):
         arch, patch_size = "vit_small", 16
 
     # download checkpoint from hf
-    checkpoint = hf_hub_download(repo_id="eminorhan/"+model_name, filename=model_name+".pth")
+
+    if data != "random":
+        checkpoint = hf_hub_download(repo_id="eminorhan/"+model_name, filename=model_name+".pth", cache_dir='/data/alban/models/huggingface_hub')
 
     if alg == "dino" or alg == "mugs":
         model = build_dino_mugs(arch, patch_size)
-        load_dino_mugs(model, checkpoint, "teacher")
+        if data != "random":
+            load_dino_mugs(model, checkpoint, "teacher")
     elif alg == "mae":
         model = build_mae(arch, patch_size)
-        load_mae(model, checkpoint)
-
+        if data != "random":
+            load_mae(model, checkpoint)
     return model
 
 def load_dino_mugs(model, pretrained_weights, checkpoint_key):
@@ -303,8 +303,9 @@ def display_image(image_path, max_size=12):
 
 ### Written by Alban Flachot
 def retrieve_tokens(model, img, patch_size = 14, device=torch.device("cpu"), threshold=None,
-                         separate_heads=True, layer = 1):
+                         separate_heads=True, layer = 12):
 
+    model = model.to(device)
     # make the image divisible by the patch size
     w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
     img = img[:, :w, :h].unsqueeze(0)
@@ -315,10 +316,12 @@ def retrieve_tokens(model, img, patch_size = 14, device=torch.device("cpu"), thr
     representations = model.get_intermediate_layers(img.to(device), n=layer)
 
     # we keep only the output patch attention (cls token)
+    CLS_token = list()
     for l in range(len(representations)):
-        CLS_token = representations[l][0,0].detach().cpu().numpy()
-        patch_token = representations[l][0,1:].detach().cpu().numpy()
-    return CLS_token, patch_token
+        CLS_token.append(representations[l][0,0].detach().cpu().numpy())
+        #patch_token = representations[l][0,1:].detach().cpu().numpy()
+    return CLS_token#, patch_token
+
 
 
 

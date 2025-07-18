@@ -4,11 +4,20 @@ from utils import *
 import argparse
 import glob
 from os.path import join, exists
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', help='path to real images')
 parser.add_argument('--model', help='name, either ego or saycam')
+parser.add_argument('--cuda', action='store_true', default=False)
+parser.add_argument('--gpuid', default = 0, help='only when cuda is available')
 opt = parser.parse_args()
+
+if opt.cuda:
+    device = torch.device(f"cuda:{opt.gpuid}")
+else:
+    device = torch.device("cpu")
+
 
 # import model
 if opt.model == 'ego':
@@ -17,13 +26,23 @@ elif opt.model == 'saycam':
     model = load_model('dino_say_vitb14')
 elif opt.model == 'imagenet':
     model = load_model('dino_imagenet100_vitb14')
+elif opt.model == "supervised":
+    from transformers import ViTFeatureExtractor, ViTModel
+    model = ViTModel.from_pretrained('google/vit-huge-patch14-224-in21k')
+    print(model)
 else:
-    print('Forgot to specify which model to use')
+    model = load_model(f'dino_{opt.model}_vitb14')
 
 print(f"We will save the activations of the model trained on {opt.model} and tested on {opt.dataset}")
 # create list of images to run
-globimages = glob.glob('testsets/' + opt.dataset + '/*.tif')
+globimages = glob.glob('testsets/' + opt.dataset + '/*.png')
+if len(globimages) < 1:
+    globimages = glob.glob('testsets/' + opt.dataset + '/*.jpg')
+if len(globimages) < 1:
+    globimages = glob.glob('testsets/' + opt.dataset + '/*.tif')
 globimages.sort()
+
+
 
 # savedir path
 root = '/data/alban/activations'
@@ -39,7 +58,7 @@ for i, imgp in enumerate(globimages):
     img = preprocess_image(imgp, 1400)
     with torch.no_grad():
         ### visualize attention over blocks
-        cls_token, patch_token = retrieve_tokens(model, img)
+        cls_token= retrieve_tokens(model, img, device = device)
         np.save(join(savedir_path, f'cls_token_{image_name}.npy'), cls_token)
-        np.save(join(savedir_path, f'patch_token_{image_name}.npy'), patch_token)
+
 
