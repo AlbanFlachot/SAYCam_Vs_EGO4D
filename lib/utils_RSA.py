@@ -35,7 +35,9 @@ def compute_RDMs(model, dataset, listimages, display = True):
     for i, im in enumerate(listimages):
         cls_token.append(np.load(join(path2activations, f'cls_token_{im[:-4]}.npy')))
         #patch_token.append(np.load(join(path2activations, f'patch_token_{im[:-4]}.npy')))
-    cls_token = np.array(cls_token)
+
+    cls_token = np.array(cls_token).reshape(len(listimages), 12,-1)
+
     #corr_cls = np.corrcoef(cls_token.reshape(len(listimages), -1))
     CORRs = list()
     for lay in range(cls_token.shape[1]):
@@ -48,18 +50,17 @@ def compute_RDMs(model, dataset, listimages, display = True):
 
     if display:
         fig, subs = plt.subplots(1,1)
-        # Using a different colormap that goes from blue (similar) to red (dissimilar)
         sns.heatmap(CORRs[-1],
                     annot=False,
                     cmap='Greys',      # Blue to red colormap
                     square=True,
-                    cbar=False,
+                    cbar=True,
                     #cbar_kws={'label': 'Dissimilarity'},
                     #fmt='.2f',
                     linewidths=0,
                     ax = subs,
                     vmin=0,               # Set minimum value for color scale
-                    vmax=1)               # Set maximum value for color scale
+                    vmax=np.max(CORRs[-1]))               # Set maximum value for color scale
 
 
         subs.set_title(f'Trained on {model} and tested on {dataset}')
@@ -105,7 +106,7 @@ def display_RDM(RDM, model):
                 vmin=0,               # Set minimum value for color scale
                 vmax=1)               # Set maximum value for color scale
 
-    subs.set_title('correlation')
+    subs.set_title(model)
     subs.axis('off')
     fig.tight_layout()
     plt.show()
@@ -166,8 +167,9 @@ def plot_tsne_results(tsne_results, labels, figsize=(4.5, 3),
     plt.figure(figsize=figsize)
 
     # Create scatter plot
+    cmap = 'autumn'
     scatter = plt.scatter(tsne_results[:, 0], tsne_results[:, 1],
-                         c=label_encoded, cmap='autumn',
+                         c=label_encoded, cmap=cmap,
                          alpha=0.7, s=50)
 
     # Add labels and title
@@ -192,23 +194,36 @@ def analyze_clusters(tsne_results, labels):
     """
     Analyze cluster quality and separation
     """
-    from sklearn.metrics import silhouette_score
+    from sklearn.metrics import silhouette_score, adjusted_rand_score
     from sklearn.preprocessing import LabelEncoder
+    from sklearn.cluster import KMeans
+    import numpy as np
 
     le = LabelEncoder()
     label_encoded = le.fit_transform(labels)
+    n_clusters = len(np.unique(labels)) # for kmeans
 
     # Calculate silhouette score
     sil_score = silhouette_score(tsne_results, label_encoded)
-
     print(f"Silhouette Score: {sil_score:.3f}")
-    print(f"Number of unique labels: {len(np.unique(labels))}")
+    print(f"Number of unique labels: {n_clusters}")
 
     # Label distribution
     unique, counts = np.unique(labels, return_counts=True)
     print("\nLabel distribution:")
     for label, count in zip(unique, counts):
         print(f"  {label}: {count} images")
+
+    # Calculate ARI by comparing clustering results to ground truth
+
+    ari_results = {}
+
+    # Method 1: K-means clustering
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    kmeans_labels = kmeans.fit_predict(tsne_results)
+    ari_kmeans = adjusted_rand_score(label_encoded, kmeans_labels)
+    ari_results['KMeans'] = ari_kmeans
+    print(f"K-Means ARI: {ari_kmeans:.3f}")
 
     return sil_score
 

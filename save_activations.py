@@ -27,9 +27,10 @@ elif opt.model == 'saycam':
 elif opt.model == 'imagenet':
     model = load_model('dino_imagenet100_vitb14')
 elif opt.model == "supervised":
-    from transformers import ViTFeatureExtractor, ViTModel
-    model = ViTModel.from_pretrained('google/vit-huge-patch14-224-in21k')
-    print(model)
+    from transformers import ViTImageProcessor, ViTForImageClassification
+    from PIL import Image
+    processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
+    model_supervised = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
 else:
     model = load_model(f'dino_{opt.model}_vitb14')
 
@@ -55,10 +56,25 @@ if not exists(savedir_path):
 for i, imgp in enumerate(globimages):
     image_name = imgp.split('/')[-1][:-4]
     print(f'Retrieving activations for image {i}/{len(globimages)}')
-    img = preprocess_image(imgp, 1400)
-    with torch.no_grad():
-        ### visualize attention over blocks
-        cls_token= retrieve_tokens(model, img, device = device)
-        np.save(join(savedir_path, f'cls_token_{image_name}.npy'), cls_token)
+    ### the supervised model is from google and thus different procedure
+    if opt.model == 'supervised':
+        image = Image.open(imgp)
+        if len(image.size) == 2: #greyscale
+            image = image.convert("L")
+            image = Image.merge("RGB", (image, image, image))
+        # Process
+        inputs = processor(images=image, return_tensors="pt")
+        # Extract CLS token
+        model_supervised.eval()
+        with torch.no_grad():
+            outputs = model_supervised(**inputs, output_hidden_states=True)
+            cls_token = [outputs.hidden_states[l][0, 0] for l in range(1, 13)] # ignore 1st input layer to extract only 12 cls_tokens,
+            np.save(join(savedir_path, f'cls_token_{image_name}.npy'), np.array(cls_token))
+    else:
+        img = preprocess_image(imgp, 224)
+        with torch.no_grad():
+            ### visualize attention over blocks
+            cls_token= retrieve_tokens(model, img, device = device)
+            np.save(join(savedir_path, f'cls_token_{image_name}.npy'), cls_token)
 
 
