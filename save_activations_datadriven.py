@@ -26,6 +26,8 @@ elif opt.model == 'saycam':
     model = load_model('dino_say_vitb14')
 elif opt.model == 'imagenet':
     model = load_model('dino_imagenet100_vitb14')
+elif opt.model == 'resnet':
+    model = load_model('dino_say_resnext50')
 elif opt.model == "supervised":
     from transformers import ViTImageProcessor, ViTForImageClassification
     from PIL import Image

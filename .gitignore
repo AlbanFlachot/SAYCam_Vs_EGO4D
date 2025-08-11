@@ -8,6 +8,7 @@
 *.out
 *.tif
 *.mat
+*.png
 
 # Directories
 **/__pycache__/
@@ -15,3 +16,4 @@ y_imgs/
 fids/
 venv
 outputs_visualization
+testsets
