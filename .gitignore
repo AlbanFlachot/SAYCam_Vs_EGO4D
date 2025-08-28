@@ -14,6 +14,6 @@
 **/__pycache__/
 y_imgs/
 fids/
-venv
-outputs_visualization
-testsets
+venv/
+outputs_visualization/
+testsets/

@@ -54,10 +54,7 @@ def similarity_L2norm(vectors, squared = False, normalize=False):
     if normalize:
         vectors = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
     # Compute similarity matrix (l2 norm similarity)
-    if squared:
-        return euclidean_distances(vectors , squared=True) # We use sklear instead of scipy coz for large matrices it is much wafaster!
-    else:
-        return euclidean_distances(vectors , squared=False)
+    return euclidean_distances(vectors , squared= squared) # We use sklear instead of scipy coz for large matrices it is much wafaster!
 
 
 def compute_RDMs(activations, metric = 'pearson', display = True, title = '', torch = True):
@@ -161,7 +158,6 @@ def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine'):#
         RDM1 = cka.centering(RDM1)
         RDM2 = cka.centering(RDM2)
 
-    # Extract upper triangular part (excluding diagonal)
     n = len(RDM1)
     upper_indices = np.triu_indices(n, k=1)  # k=1 excludes diagonal
     upper_RDM1 = RDM1[upper_indices]
@@ -169,8 +165,10 @@ def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine'):#
 
     # compute similarity
     if metric == 'cosine':
-        sim = cosine_similarity(upper_RDM1, upper_RDM2)
+        sim = cosine_similarity(RDM1, RDM2)
     elif metric == 'pearson':
+        # Extract upper triangular part (excluding diagonal)
+
         sim =np.corrcoef(upper_RDM1, upper_RDM2)[0,1]
 
     return sim
