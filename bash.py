@@ -14,6 +14,7 @@ for model in ['ego', 'saycam', 'random', 'imagenet', 's', 'a', 'y']:
         args = shlex.split(command)
         subprocess.call(args)'''
 
+'''
 ### Save activations for datadriven approach
 for model in ['resnet']:#['ego', 'saycam', 'imagenet', 'supervised', 'random']:
 #for model in ['supervised']:
@@ -23,4 +24,22 @@ for model in ['resnet']:#['ego', 'saycam', 'imagenet', 'supervised', 'random']:
         # command = f"python3 save_activations.py --model {model} --dataset {dataset}" # if don't specify GPU
         command = f"python3 save_activations_datadriven.py --model {model} --dataset {dataset} --cuda --gpuid {gpu}" # if want to use a GPU
         args = shlex.split(command)
-        subprocess.call(args)
+        subprocess.call(args)'''
+
+
+### Run stimuli selection algorithm
+models = ['ego', 'saycam', 'imagenet', 'supervised', 'resnet']
+for dataset in ['ecoVal']:
+    for compactness_measure in ['Fisher_discriminant']:
+        for compactness_diff_measure in ['rank']:
+            args = [
+                'python3', 'compactness_stimuli_selection.py',
+                '--models', *models,
+                '--dataset', dataset,
+                '--normalize',
+                '--compactness_measure', compactness_measure,
+                '--nb_considered_categories', str(10),
+                '--compactness_diff_measure', compactness_diff_measure,
+                '--similarity_measure', 'contrast',
+            ]
+            subprocess.call(args)

@@ -23,7 +23,7 @@ def cosine_similarity(vector1, vector2):
         cosine similarity
     """
     # Ensure matrices have the same shape
-    assert vector1.shape == vector2.shape, "vectors must have the same shape"
+    assert vector1.shape == vector2.shape, "inputs must have the same shape"
 
     # Compute cosine similarity manually
     dot_product = np.dot(vector1, vector2)
@@ -144,7 +144,8 @@ def compute_RDMs_models(model, dataset, listimages, metric = 'pearson', normaliz
         return RDMs
 
 
-def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine'):#
+
+def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine', means = {}):#
     '''
     Function to compute correlational similarity between 2 RDMs.
     Only considers the upper triangular part, excluding the diagonal.
@@ -152,7 +153,7 @@ def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine'):#
     '''
 
     assert RDM1.shape == RDM2.shape # two RDMs should be of the same size
-    assert metric in ['cosine', 'pearson', 'spearman']
+    assert metric in ['cosine', 'pearson', 'spearman', 'pearson_global']
 
     if center: ### center matrices
         RDM1 = cka.centering(RDM1)
@@ -165,14 +166,19 @@ def Compute_sim_RDMs(RDM1, RDM2, center = False, metric = 'cosine'):#
 
     # compute similarity
     if metric == 'cosine':
-        sim = cosine_similarity(RDM1, RDM2)
+        sim = cosine_similarity(upper_RDM1, upper_RDM2)
     elif metric == 'pearson':
-        # Extract upper triangular part (excluding diagonal)
-
+        #print(np.corrcoef(upper_RDM1, upper_RDM2))
         sim =np.corrcoef(upper_RDM1, upper_RDM2)[0,1]
-
+    elif metric == 'pearson_global': # to use for a subset if want to predict similarity measure for a larger set of RDM entries
+        RDM1_centered = RDM1[upper_indices] - means['x']
+        RDM2_centered = RDM2[upper_indices] - means['y']
+        n = len(RDM1_centered)
+        cov = np.mean(RDM1_centered*RDM2_centered)
+        #norm = np.std(RDM1_centered) * np.std(RDM2_centered)
+        norm = means['norm']
+        sim = cov/norm
     return sim
-
 
 def corrs_layers(RDMs, models):
     '''

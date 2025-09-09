@@ -6,15 +6,22 @@
 import math
 import numpy as np
 
-
-def centering(K):
+def centering_mat(K):
     n = K.shape[0]
     unit = np.ones([n, n])
     I = np.eye(n)
     H = I - unit / n
 
-    #return np.dot(np.dot(H, K), H)  # HKH are the same with KH, KH is the first centering, H(KH) do the second time, results are the sme with one time centering
-    return np.dot(H, K)  # KH
+    return np.dot(np.dot(H, K), H)  # HKH are the same with KH, KH is the first centering, H(KH) do the second time, results are the sme with one time centering
+    #return np.dot(H, K)  # KH
+
+def centering(K):
+    n = K.shape[0]
+    # More memory efficient: avoid creating the full H matrix
+    K_centered = K - K.mean(axis=0, keepdims=True)  # Center columns
+    K_centered = K_centered - K_centered.mean(axis=1, keepdims=True)  # Center rows
+    #K_centered = K_centered + K.mean()  # Add back overall mean
+    return K_centered
 
 
 def rbf(X, sigma=None):
