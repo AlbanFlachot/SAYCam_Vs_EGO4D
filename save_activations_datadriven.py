@@ -38,6 +38,8 @@ else:
 
 if opt.dataset == 'ecoVal':
     path2dataset = '/raid/shared/datasets/visoin/ecoset/val/'
+elif opt.dataset == 'imagenetVal':
+    path2dataset = '/shared/datasets/vision/imagenet/val/'
 
 print(f"We will save the activations of the model trained on {opt.model} and tested on {opt.dataset}")
 # create list of images to run

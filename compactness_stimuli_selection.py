@@ -29,7 +29,7 @@ opt = parser.parse_args()
 dataset = opt.dataset
 models  = opt.models
 print(models)
-path2activations = f'/home/alban/Documents/activations_datadriven/%s_{dataset}/'
+path2activations = f'/data/alban/activations_datadriven/%s_{dataset}/'
 
 imagelists = {}
 activations = {}
@@ -118,6 +118,7 @@ imagespaths = {}
 
 for i, model1 in enumerate(models[:-1]):
     for j, model2 in enumerate(models[i+1:]):
+        savename = f'{opt.dataset}_{opt.normalize}normalize_{opt.compactness_measure}_{opt.compactness_diff_measure}_{opt.similarity_measure}_{model1}_{model2}'
         labels[model1 + '_' + model2], sortedmaxdiffcats[model1 + '_' + model2], maxdiffs[model1 + '_' + model2] = max_rsa.max_compactness_difference(
                 compact_categories, compactness, nb_categories, listcat, models = [model1, model2],
                 nb_considered_categories = nb_considered_categories, compactness_diff_measure = opt.compactness_diff_measure
@@ -125,19 +126,24 @@ for i, model1 in enumerate(models[:-1]):
 
         max_dissimilarity_images[model1 + '_' + model2] = max_rsa.find_max_dissimilarity_images(
                 cat_activations, [model1, model2], labels[model1 + '_' + model2][:nb_considered_categories], nb_per_cat,
-                images_per_subset=4, similarity_metric=opt.similarity_measure, diffs = maxdiffs[model1 + '_' + model2]
+                images_per_subset=4, similarity_metric=opt.similarity_measure, diff = maxdiffs[model1 + '_' + model2]
             )
 
         similarity_dict[model1 + '_' + model2] = max_rsa.compute_sub_rdm_similarity(
             max_dissimilarity_images[model1 + '_' + model2], cat_activations, [model1, model2], labels[model1 + '_' + model2][:nb_considered_categories],
-            savename = f'figures/compactness/sub_RDMs/{opt.normalize}normalize_{opt.compactness_measure}_{opt.compactness_diff_measure}_{model1}_{model2}.png')
+            savename = f'figures/compactness/sub_RDMs/{savename}.png')
 
-        imagelist = [img.replace('/raid/shared/datasets/visoin/', '/home/alban/Documents/') for img in imagelist]
-        images, imagespaths[[model1 + '_' + model2]] = max_rsa.display_low_similarity_images(imagelist, similarity_dict[model1 + '_' + model2]['selected_indices'], n_images=40,
+        #imagelist = [img.replace('/raid/shared/datasets/visoin/', '/home/alban/Documents/') for img in imagelist]
+        images, imagespaths[model1 + '_' + model2] = max_rsa.display_low_similarity_images(imagelist, similarity_dict[model1 + '_' + model2]['selected_indices'], n_images=40,
                                                       grid_cols=8, figsize=(20, 10),
-                                                      save_path=f'figures/compactness/subset/{opt.normalize}normalize_{opt.compactness_measure}_{opt.compactness_diff_measure}_{opt.similarity_measure}_{model1}_{model2}.png')
+                                                      save_path=f'figures/compactness/subset/{savename}.png')
 
 RESULTS = {}
 RESULTS['max_dissimilarity_images'] = max_dissimilarity_images
 RESULTS['similarity_dict'] = similarity_dict
 RESULTS['imagepaths'] = imagespaths
+
+import pickle
+f = open(f"/data/alban/results_image_selection/{opt.dataset}_{opt.normalize}normalize_{opt.compactness_measure}_{opt.compactness_diff_measure}_{opt.similarity_measure}.pkl","wb")
+pickle.dump(RESULTS,f)
+f.close()

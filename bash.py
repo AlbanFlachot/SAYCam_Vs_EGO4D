@@ -29,17 +29,30 @@ for model in ['resnet']:#['ego', 'saycam', 'imagenet', 'supervised', 'random']:
 
 ### Run stimuli selection algorithm
 models = ['ego', 'saycam', 'imagenet', 'supervised', 'resnet']
-for dataset in ['ecoVal']:
-    for compactness_measure in ['Fisher_discriminant']:
-        for compactness_diff_measure in ['rank']:
-            args = [
-                'python3', 'compactness_stimuli_selection.py',
-                '--models', *models,
-                '--dataset', dataset,
-                '--normalize',
-                '--compactness_measure', compactness_measure,
-                '--nb_considered_categories', str(10),
-                '--compactness_diff_measure', compactness_diff_measure,
-                '--similarity_measure', 'contrast',
-            ]
-            subprocess.call(args)
+#models = ['ego', 'saycam']
+for dataset in ['ecoVal', 'imagenetVal']:
+    for compactness_measure in ['Fisher_discriminant', 'silhouette_score']:
+        for compactness_diff_measure in ['rank', 'normalizedDiff']:
+            for similarity in ['pearson', 'contrast']:
+                args = [
+                    'python3', 'compactness_stimuli_selection.py',
+                    '--models', *models,
+                    '--dataset', dataset,
+                    '--normalize',
+                    '--compactness_measure', compactness_measure,
+                    '--nb_considered_categories', str(12),
+                    '--compactness_diff_measure', compactness_diff_measure,
+                    '--similarity_measure', similarity,
+                ]
+                subprocess.call(args)
+                ### without normalization
+                args = [
+                    'python3', 'compactness_stimuli_selection.py',
+                    '--models', *models,
+                    '--dataset', dataset,
+                    '--compactness_measure', compactness_measure,
+                    '--nb_considered_categories', str(12),
+                    '--compactness_diff_measure', compactness_diff_measure,
+                    '--similarity_measure', similarity,
+                ]
+                subprocess.call(args)
