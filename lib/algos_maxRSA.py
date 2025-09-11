@@ -226,9 +226,9 @@ def find_max_dissimilarity_images(cat_activations, models, categories, nb_per_ca
                 n = len(rdm1)
                 upper_indices = np.triu_indices(n, k=1)  # k=1 excludes diagonal
                 if diff[c] <0:
-                    similarity = -(np.mean(rdm1[upper_indices]) - means['x']) + (np.mean(rdm2[upper_indices]) - means['y'])
+                    similarity = -np.mean(rdm1[upper_indices])/means['x'] + np.mean(rdm2[upper_indices])/means['y']
                 else:
-                    similarity = (np.mean(rdm1[upper_indices]) - means['x']) - (np.mean(rdm2[upper_indices]) - means['y'])
+                    similarity = np.mean(rdm1[upper_indices])/means['x'] - np.mean(rdm2[upper_indices])/means['y']
 
             # Update best if this is better
             if similarity < best_similarity:
