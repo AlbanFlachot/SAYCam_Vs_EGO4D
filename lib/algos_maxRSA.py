@@ -209,7 +209,7 @@ def find_max_dissimilarity_images(cat_activations, models, categories, nb_per_ca
         best_indices = None
         best_model1_rdm = None
         best_model2_rdm = None
-        best_similarity = 1
+        best_similarity = np.inf
 
         # Test each combination
         for combination in tqdm(all_combinations, desc="Testing combinations", leave=False, position=1):
@@ -396,7 +396,61 @@ def check_list_similarity(list1, list2):
     return proportion
 
 
+def find_subsimilar_subset(cat_activations, submodels, categories, images_per_subset=4, nb_per_category=50):
+    nb_categories = len(categories)
+    dissimilarity_metric = 'L2squared'
+    #### First build the RDMs using all images of the chosen categories to get the general stats
+    cat_activations_subset1 = cat_activations[submodels[0]][categories]
+    cat_activations_subset2 = cat_activations[submodels[1]][categories]
 
+    cat_shape = cat_activations_subset1.shape
+
+    RDM1 = rsa.compute_RDMs(cat_activations_subset1.reshape(cat_shape[0] * cat_shape[1], -1),
+                            metric=dissimilarity_metric, display=False)
+    RDM2 = rsa.compute_RDMs(cat_activations_subset2.reshape(cat_shape[0] * cat_shape[1], -1),
+                            metric=dissimilarity_metric, display=False)
+    RDM1_centered = RDM1 - np.mean(RDM1)
+    RDM2_centered = RDM2 - np.mean(RDM2)
+
+    RDM1_centered = RDM1_centered / np.sqrt(np.sum(RDM1_centered ** 2, axis = 0))
+    RDM2_centered = RDM2_centered / np.sqrt(np.sum(RDM2_centered ** 2, axis = 0))
+
+    correlations = np.sum(RDM1_centered * RDM2_centered, axis=0)
+    category_correlations = correlations.reshape(nb_categories, -1)
+
+    # Initialize arrays for sorted results
+    correlations_sorted = np.zeros(len(RDM1))
+    sort_indices = list()
+    sort_indices_global = list()
+    category_boundaries = []
+
+    # Sort within each category (12 categories, 50 images each)
+    for cat, category in enumerate(categories):
+        start_idx = cat * nb_per_category
+        end_idx = (cat + 1) * nb_per_category
+
+        # Get correlations for this category
+        cat_correlations = correlations[start_idx:end_idx]
+
+        # Get sorting indices (lowest to highest correlation)
+        cat_sort_indices = np.argsort(cat_correlations)
+
+        # Store sorted correlations
+        correlations_sorted[start_idx:end_idx] = cat_correlations[cat_sort_indices]
+
+        # Store original indices (adjusted for global position)
+        sort_indices.append(start_idx + cat_sort_indices[:images_per_subset])
+        sort_indices_global.append( category * nb_per_category + cat_sort_indices[:images_per_subset])
+
+        # Store category boundaries
+        category_boundaries.append((start_idx, end_idx))
+
+    sort_indices = np.array(sort_indices).flatten()
+    # Reorder RDM columns according to the sorting
+    RDM1_sorted = RDM1[np.ix_(sort_indices, sort_indices)]
+    RDM2_sorted = RDM2[np.ix_(sort_indices, sort_indices)]
+
+    return RDM1, RDM2, RDM1_sorted, RDM2_sorted, np.array(sort_indices_global).flatten()
 
 def analyze_selected_images(results, categories):
     """
@@ -466,7 +520,7 @@ def plot_stats_one(SIMs, submodels, labels=['label1', 'label2'], savename = None
     '''Plot the compactness as a function of sorted image category.
     All model curves appear in one plot with the model names as labels.
     '''
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 6))
 
     minval = 1
     maxval = 0
@@ -490,6 +544,7 @@ def plot_stats_one(SIMs, submodels, labels=['label1', 'label2'], savename = None
     plt.show()
     plt.close()
 
+    return fig, ax
 
 
 import cv2
