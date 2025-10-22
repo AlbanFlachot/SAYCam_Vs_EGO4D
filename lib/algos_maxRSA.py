@@ -13,7 +13,8 @@ def compute_compactness(cat_activations, models, listcat, measure = 'Fisher_disc
     Good for very large datasets.
     """
     compactness = {}
-    compact_categories = {}
+    sorted_compactness = {}
+    sorted_compact_categories = {}
 
     for model in models:
         print(model)
@@ -103,40 +104,90 @@ def compute_compactness(cat_activations, models, listcat, measure = 'Fisher_disc
 
         # Sort and store results
         sort_indices = np.argsort(compact)
-        compactness[model] = compact[sort_indices]
-        compact_categories[model] = np.array(listcat)[sort_indices]
+        compactness[model] = compact
+        sorted_compactness[model] = compact[sort_indices]
+        sorted_compact_categories[model] = np.array(listcat)[sort_indices]
 
-    return compactness, compact_categories
+    return sorted_compactness, sorted_compact_categories, compactness
 
-def max_compactness_difference(compact_categories, compactness, nb_categories, listcat, models = ['saycam', 'ego'], nb_considered_categories = 12, compactness_diff_measure = 'rank'):
+
+def alternate_pos_neg(arr):
+    """
+    Rearrange array by alternating positive and negative values
+    while preserving descending absolute value order as much as possible.
+
+    Args:
+        arr: List sorted by absolute values in descending order
+
+    Returns:
+        List with alternating positive/negative values
+    """
+    # Separate into positive and negative values (maintaining their order)
+    positives = [x for x in arr if x > 0]
+    negatives = [x for x in arr if x < 0]
+
+    result = []
+    i, j = 0, 0
+
+    # Alternate between positive and negative
+    # Start with whichever has the larger absolute value
+    start_with_positive = True
+    if positives and negatives:
+        start_with_positive = abs(positives[0]) >= abs(negatives[0])
+    elif negatives:
+        start_with_positive = False
+
+    while i < len(positives) or j < len(negatives):
+        if start_with_positive:
+            if i < len(positives):
+                result.append(positives[i])
+                i += 1
+            elif j < len(negatives):
+                result.append(negatives[j])
+                j += 1
+            start_with_positive = False
+        else:
+            if j < len(negatives):
+                result.append(negatives[j])
+                j += 1
+            elif i < len(positives):
+                result.append(positives[i])
+                i += 1
+            start_with_positive = True
+
+    return result
+
+
+
+def max_compactness_difference(compact_categories, compactness, listcat, models = ['saycam', 'ego'], nb_considered_categories = 12, compactness_diff_measure = 'rank'):
     '''
     Function that sorts categories following the maximum difference in compactness given 2 models
     '''
-    ori_cat = np.arange(0,nb_categories)
-    comp_cat = np.zeros(nb_categories)
-
-    model1_rank_lookup = {cat: rank for rank, cat in enumerate(compact_categories[models[1]])}
-    for c, cat in enumerate(compact_categories[models[0]]):
-        comp_cat[c] = model1_rank_lookup[cat]
 
     if compactness_diff_measure == 'rank':
-        diff = comp_cat - ori_cat  # distance in terms of rank
-    else:
+        diff = np.zeros(len(listcat))
+
+        model1_rank_lookup = {cat: rank for rank, cat in enumerate(compact_categories[models[0]])}
+        model2_rank_lookup = {cat: rank for rank, cat in enumerate(compact_categories[models[1]])}
+        for c, cat in enumerate(listcat):
+            diff[c] = model2_rank_lookup[cat] - model1_rank_lookup[cat]
+    elif compactness_diff_measure == 'normalizedDiff':
         compactness0 = compactness[models[0]] - np.mean(compactness[models[0]]) # center compactness
         compactness1 = compactness[models[1]] - np.mean(compactness[models[1]])
         compactness0 = compactness0/np.max(compactness0)
         compactness1 = compactness1/np.max(compactness1)
 
-        diff = compactness1[comp_cat.astype(int)] - compactness0[ori_cat.astype(int)] # distance in terms of compactness
-    sortedmaxdiffcats = np.array(listcat)[np.argsort(-np.absolute(diff))]
-    labels = np.argsort(-np.absolute(diff))
-    maxdiffs = diff[labels]
+        diff = compactness1 - compactness0 # distance in terms of compactness
+
+    indexes = np.argsort(-np.absolute(diff))
+    sortedmaxdiffcats = np.array(listcat)[indexes]
+    maxdiffs = diff[indexes]
     print(nb_considered_categories)
     print(f'The {nb_considered_categories} categories leading to the max differences between {models[0]} and {models[1]} are {sortedmaxdiffcats[:nb_considered_categories]}')
-    print(f'Category numbers are {labels[:nb_considered_categories]}')
+    print(f'Category numbers are {indexes[:nb_considered_categories]}')
     print(f'With differences in compactness of  {maxdiffs[:nb_considered_categories]}')
 
-    return labels, sortedmaxdiffcats, maxdiffs
+    return indexes, sortedmaxdiffcats, maxdiffs
 
 from itertools import combinations
 def find_max_dissimilarity_images(cat_activations, models, categories, nb_per_cat,
@@ -530,7 +581,7 @@ def plot_stats_one(SIMs, submodels, labels=['label1', 'label2'], savename = None
         minval = min(minval, np.amin(SIMs[model]))
         maxval = max(maxval, np.amax(SIMs[model]))
 
-    maxval = min(maxval, 1.1)
+    maxval = max(maxval, 1.1)
     ax.set_ylim(np.round(minval, 1) - 0.1, np.round(maxval, 1) + 0.1)
 
     ax.set_xlabel(labels[0])
@@ -553,7 +604,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import os
 
-def display_low_similarity_images(image_paths, indices_vectorized, n_images=40,
+def display_low_similarity_images(image_paths, indices_vectorized, compactness_values, n_images=40,
                                  grid_cols=8, figsize=(20, 10), save_path=None):
     """
     Load and display the first n images corresponding to lowest similarity indices.
@@ -581,6 +632,8 @@ def display_low_similarity_images(image_paths, indices_vectorized, n_images=40,
         List of valid image paths that were successfully loaded
     """
 
+
+    nb_images_per_category = n_images // len(compactness_values)
     # Get the indices for the first n_images with lowest similarity
     low_similarity_indices = indices_vectorized[:n_images]
 
@@ -647,13 +700,28 @@ def display_low_similarity_images(image_paths, indices_vectorized, n_images=40,
             # Display image
             ax.imshow(loaded_images[i])
 
+            category_value = compactness_values[i//nb_images_per_category] # add borders to categories with low compactness for model 1
+            if category_value is not None and category_value < 0:
+                #print('Border added')
+                # Turn on axis to show border
+                ax.axis('on')
+                # Set all spines to black with thick width
+                for spine in ax.spines.values():
+                    spine.set_edgecolor('black')
+                    spine.set_linewidth(4)
+                # Remove ticks
+                ax.set_xticks([])
+                ax.set_yticks([])
+            else:
+                ax.axis('off')
+
             # Add title with original index and filename
             filename = Path(valid_paths[i]).name
             label = valid_paths[i].split('/')[-2]
             ax.set_title(f'Label: {label }\n{filename[:20]}...',
                         fontsize=8, pad=2)
 
-        ax.axis('off')
+        #ax.axis('off')
 
     plt.tight_layout()
 
